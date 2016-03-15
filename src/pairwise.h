@@ -12,7 +12,7 @@
 //  This file implements the LambdaMart algorithm for learning ranking functions.
 //  The main idea is to model p_ij, the probability that item i should rank higher
 //  than j, as
-//       p_ij = 1 / (1 + exp(s_i - s_j)),
+//       p_ij = 1 / (1 + std::exp(s_i - s_j)),
 //  where s_i, s_j are the model scores for the two items.
 //
 //  While scores are still generated one item at a time, gradients for learning
@@ -55,6 +55,7 @@
 #ifndef PAIRWISE_H
 #define PAIRWISE_H
 
+#include <memory>
 #include "distribution.h"
 #include "buildinfo.h"
 
@@ -265,67 +266,56 @@ public:
 
     virtual ~CPairwise();
 
-    GBMRESULT Initialize(double *adY,
-                         double *adGroup,
-                         double *adOffset,
-                         double *adWeight,
-                         unsigned long cLength);
-
-    GBMRESULT UpdateParams(double *adF,
-                           double *adOffset,
-                           double *adWeight,
-                           unsigned long cLength)
-    {
-        return GBM_OK;
-    };
-
-    GBMRESULT ComputeWorkingResponse(double *adY,
-                                     double *adGroup,
-                                     double *adOffset,
-                                     double *adF,
-                                     double *adZ,
-                                     double *adWeight,
-                                     bool *afInBag,
-                                     unsigned long nTrain,
-                                     int cIdxOff);
-
-    double Deviance(double *adY,
-                    double *adGroup,
-                    double *adOffset,
-                    double *adWeight,
-                    double *adF,
-                    unsigned long cLength,
-                    int cIdxOff);
-
-    GBMRESULT InitF(double *adY,
-                    double *adGroup,
-                    double *adOffset,
-                    double *adWeight,
-                    double &dInitF,
+    void Initialize(const double *adY,
+		    const double *adGroup,
+		    const double *adOffset,
+		    const double *adWeight,
+		    unsigned long cLength);
+    
+    void ComputeWorkingResponse(const double *adY,
+				const double *adGroup,
+				const double *adOffset,
+				const double *adF,
+				double *adZ,
+				const double *adWeight,
+				const bag& afInBag,
+				unsigned long nTrain);
+    
+    double Deviance(const double *adY,
+                    const double *adGroup,
+                    const double *adOffset,
+                    const double *adWeight,
+                    const double *adF,
                     unsigned long cLength);
 
-    GBMRESULT FitBestConstant(double *adY,
-                              double *adGroup,
-                              double *adOffset,
-                              double *adW,
-                              double *adF,
-                              double *adZ,
-                              const std::vector<unsigned long>& aiNodeAssign,
-                              unsigned long nTrain,
-                              VEC_P_NODETERMINAL vecpTermNodes,
-                              unsigned long cTermNodes,
-                              unsigned long cMinObsInNode,
-                              bool *afInBag,
-                              double *adFadj,
-                              int cIdxOff);
+    void InitF(const double *adY,
+	       const double *adGroup,
+	       const double *adOffset,
+	       const double *adWeight,
+	       double &dInitF,
+	       unsigned long cLength);
 
-    double BagImprovement(double *adY,
-                          double *adGroup,
-                          double *adOffset,
-                          double *adWeight,
-                          double *adF,
-                          double *adFadj,
-                          bool *afInBag,
+    void FitBestConstant(const double *adY,
+			 const double *adGroup,
+			 const double *adOffset,
+			 const double *adW,
+			 const double *adF,
+			 double *adZ,
+			 const std::vector<unsigned long>& aiNodeAssign,
+			 unsigned long nTrain,
+			 VEC_P_NODETERMINAL vecpTermNodes,
+			 unsigned long cTermNodes,
+			 unsigned long cMinObsInNode,
+			 const bag& afInBag,
+			 const double *adFadj);
+
+    double BagImprovement(const double *adY,
+                          const double *adGroup,
+                          const double *adOffset,
+                          const double *adWeight,
+                          const double *adF,
+                          const double *adFadj,
+                          const bag& afInBag,
                           double dStepSize,
                           unsigned long nTrain);
 
@@ -334,7 +324,7 @@ protected:
     // Calculate and accumulate up the gradients and Hessians from all training pairs
     void ComputeLambdas(int iGroup, unsigned int cNumItems, const double* const adY, const double* const adF, const double* const adWeight, double* adZ, double* adDeriv);
 
-    CIRMeasure* pirm;                 // The IR measure to use
+    std::auto_ptr<CIRMeasure> pirm;                 // The IR measure to use
     CRanker ranker;                   // The ranker
 
     vector<double> vecdHessian;       // Second derivative of loss function, for each training instance; used for Newton step

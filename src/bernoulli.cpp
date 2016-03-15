@@ -4,6 +4,8 @@
 
 CBernoulli::CBernoulli()
 {
+  // Used to issue warnings to user that at least one terminal node capped
+  fCappedPred = false;
 }
 
 CBernoulli::~CBernoulli()
@@ -11,47 +13,47 @@ CBernoulli::~CBernoulli()
 }
 
 
-GBMRESULT CBernoulli::ComputeWorkingResponse
+void CBernoulli::ComputeWorkingResponse
 (
-    double *adY,
-    double *adMisc,
-    double *adOffset,
-    double *adF,
+    const double *adY,
+    const double *adMisc,
+    const double *adOffset,
+    const double *adF,
     double *adZ,
-    double *adWeight,
-    bool *afInBag,
-    unsigned long nTrain,
-    int cIdxOff
+    const double *adWeight,
+    const bag& afInBag,
+    unsigned long nTrain
 )
 {
-    unsigned long i = 0;
-    double dProb = 0.0;
-    double dF = 0.0;
+  unsigned long i = 0;
+  double dProb = 0.0;
+  double dF = 0.0;
 
-    for(i=0; i<nTrain; i++)
-    {
-        dF = adF[i] + ((adOffset==NULL) ? 0.0 : adOffset[i]);
-        dProb = 1.0/(1.0+exp(-dF));
+  for(i=0; i<nTrain; i++)
+  {
+    dF = adF[i] + ((adOffset==NULL) ? 0.0 : adOffset[i]);
+    dProb = 1.0/(1.0+std::exp(-dF));
 
-        adZ[i] = adY[i] - dProb;
-    }
-
-    return GBM_OK;
+    adZ[i] = adY[i] - dProb;
+#ifdef NOISY_DEBUG
+//  Rprintf("dF=%f, dProb=%f, adZ=%f, adY=%f\n", dF, dProb, adZ[i], adY[i]);
+    if(dProb<  0.0001) Rprintf("Small prob(i=%d)=%f Z=%f\n",i,dProb,adZ[i]);
+    if(dProb>1-0.0001) Rprintf("Large prob(i=%d)=%f Z=%f\n",i,dProb,adZ[i]);
+#endif
+  }
 }
 
 
-GBMRESULT CBernoulli::InitF
+void CBernoulli::InitF
 (
-    double *adY,
-    double *adMisc,
-    double *adOffset,
-    double *adWeight,
+    const double *adY,
+    const double *adMisc,
+    const double *adOffset,
+    const double *adWeight,
     double &dInitF,
     unsigned long cLength
 )
 {
-    GBMRESULT hr = GBM_OK;
-
     unsigned long i=0;
     double dTemp=0.0;
 
@@ -63,7 +65,7 @@ GBMRESULT CBernoulli::InitF
             dSum += adWeight[i]*adY[i];
             dTemp += adWeight[i];
         }
-        dInitF = log(dSum/(dTemp-dSum));
+        dInitF = std::log(dSum/(dTemp-dSum));
     }
     else
     {
@@ -79,7 +81,7 @@ GBMRESULT CBernoulli::InitF
             dDen=0.0;
             for(i=0; i<cLength; i++)
             {
-                dTemp = 1.0/(1.0+exp(-(adOffset[i] + dInitF)));
+                dTemp = 1.0/(1.0+std::exp(-(adOffset[i] + dInitF)));
                 dNum += adWeight[i]*(adY[i]-dTemp);
                 dDen += adWeight[i]*dTemp*(1.0-dTemp);
             }
@@ -87,21 +89,18 @@ GBMRESULT CBernoulli::InitF
             dInitF += dNewtonStep;
         }
     }
-
-    return hr;
 }
 
 
 
 double CBernoulli::Deviance
 (
-    double *adY,
-    double *adMisc,
-    double *adOffset,
-    double *adWeight,
-    double *adF,
-    unsigned long cLength,
-    int cIdxOff
+    const double *adY,
+    const double *adMisc,
+    const double *adOffset,
+    const double *adWeight,
+    const double *adF,
+    unsigned long cLength
 )
 {
    unsigned long i=0;
@@ -111,18 +110,18 @@ double CBernoulli::Deviance
 
    if(adOffset==NULL)
    {
-      for(i=cIdxOff; i<cLength+cIdxOff; i++)
+      for(i=0; i!=cLength; i++)
       {
-         dL += adWeight[i]*(adY[i]*adF[i] - log(1.0+exp(adF[i])));
+         dL += adWeight[i]*(adY[i]*adF[i] - std::log(1.0+std::exp(adF[i])));
          dW += adWeight[i];
       }
    }
    else
    {
-      for(i=cIdxOff; i<cLength+cIdxOff; i++)
+      for(i=0; i!=cLength; i++)
       {
          dF = adF[i] + adOffset[i];
-         dL += adWeight[i]*(adY[i]*dF - log(1.0+exp(dF)));
+         dL += adWeight[i]*(adY[i]*dF - std::log(1.0+std::exp(dF)));
          dW += adWeight[i];
       }
    }
@@ -131,72 +130,89 @@ double CBernoulli::Deviance
 }
 
 
-GBMRESULT CBernoulli::FitBestConstant
+void CBernoulli::FitBestConstant
 (
-    double *adY,
-    double *adMisc,
-    double *adOffset,
-    double *adW,
-    double *adF,
-    double *adZ,
-    const std::vector<unsigned long>& aiNodeAssign,
-    unsigned long nTrain,
-    VEC_P_NODETERMINAL vecpTermNodes,
-    unsigned long cTermNodes,
-    unsigned long cMinObsInNode,
-    bool *afInBag,
-    double *adFadj,
-	int cIdxOff
+  const double *adY,
+  const double *adMisc,
+  const double *adOffset,
+  const double *adW,
+  const double *adF,
+  double *adZ,
+  const std::vector<unsigned long>& aiNodeAssign,
+  unsigned long nTrain,
+  VEC_P_NODETERMINAL vecpTermNodes,
+  unsigned long cTermNodes,
+  unsigned long cMinObsInNode,
+  const bag& afInBag,
+  const double *adFadj
 )
 {
-    GBMRESULT hr = GBM_OK;
+  unsigned long iObs = 0;
+  unsigned long iNode = 0;
+  double dTemp = 0.0;
+  
+  vecdNum.resize(cTermNodes);
+  vecdNum.assign(vecdNum.size(),0.0);
+  vecdDen.resize(cTermNodes);
+  vecdDen.assign(vecdDen.size(),0.0);
 
-    unsigned long iObs = 0;
-    unsigned long iNode = 0;
-    vecdNum.resize(cTermNodes);
-    vecdNum.assign(vecdNum.size(),0.0);
-    vecdDen.resize(cTermNodes);
-    vecdDen.assign(vecdDen.size(),0.0);
-
-    for(iObs=0; iObs<nTrain; iObs++)
+  for(iObs=0; iObs<nTrain; iObs++)
+  {
+    if(afInBag[iObs])
     {
-        if(afInBag[iObs])
-        {
-            vecdNum[aiNodeAssign[iObs]] += adW[iObs]*adZ[iObs];
-            vecdDen[aiNodeAssign[iObs]] +=
-                adW[iObs]*(adY[iObs]-adZ[iObs])*(1-adY[iObs]+adZ[iObs]);
-        }
+      vecdNum[aiNodeAssign[iObs]] += adW[iObs]*adZ[iObs];
+      vecdDen[aiNodeAssign[iObs]] +=
+          adW[iObs]*(adY[iObs]-adZ[iObs])*(1-adY[iObs]+adZ[iObs]);
+#ifdef NOISY_DEBUG
+/*
+      Rprintf("iNode=%d, dNum(%d)=%f, dDen(%d)=%f\n",
+              aiNodeAssign[iObs],
+              iObs,vecdNum[aiNodeAssign[iObs]],
+              iObs,vecdDen[aiNodeAssign[iObs]]);
+*/
+#endif
     }
+  }
 
-    for(iNode=0; iNode<cTermNodes; iNode++)
+  for(iNode=0; iNode<cTermNodes; iNode++)
+  {
+    if(vecpTermNodes[iNode]!=NULL)
     {
-        if(vecpTermNodes[iNode]!=NULL)
+      if(vecdDen[iNode] == 0)
+      {
+          vecpTermNodes[iNode]->dPrediction = 0.0;
+      }
+      else
+      {
+        dTemp = vecdNum[iNode]/vecdDen[iNode];
+        // avoid large changes in predictions on log odds scale
+        if(std::abs(dTemp) > 1.0)
         {
-            if(vecdDen[iNode] == 0)
-            {
-                vecpTermNodes[iNode]->dPrediction = 0.0;
-            }
-            else
-            {
-                vecpTermNodes[iNode]->dPrediction =
-                    vecdNum[iNode]/vecdDen[iNode];
-            }
+          if(!fCappedPred)
+          {
+            // set fCappedPred=true so that warning only issued once
+            fCappedPred = true;  
+            Rcpp::warning("Some terminal node predictions were excessively large for Bernoulli and have been capped at 1.0. Likely due to a feature that separates the 0/1 outcomes. Consider reducing shrinkage parameter.");
+          }
+          if(dTemp>1.0) dTemp = 1.0;
+          else if(dTemp<-1.0) dTemp = -1.0;
         }
+        vecpTermNodes[iNode]->dPrediction = dTemp;              
+      }
     }
-
-    return hr;
+  }
 }
 
 
 double CBernoulli::BagImprovement
 (
-    double *adY,
-    double *adMisc,
-    double *adOffset,
-    double *adWeight,
-    double *adF,
-    double *adFadj,
-    bool *afInBag,
+    const double *adY,
+    const double *adMisc,
+    const double *adOffset,
+    const double *adWeight,
+    const double *adF,
+    const double *adFadj,
+    const bag& afInBag,
     double dStepSize,
     unsigned long nTrain
 )
@@ -217,13 +233,11 @@ double CBernoulli::BagImprovement
                 dReturnValue += adWeight[i]*dStepSize*adFadj[i];
             }
             dReturnValue += adWeight[i]*
-                            (log(1.0+exp(dF)) -
-                             log(1.0+exp(dF+dStepSize*adFadj[i])));
+                            (std::log(1.0+std::exp(dF)) -
+                             std::log(1.0+std::exp(dF+dStepSize*adFadj[i])));
             dW += adWeight[i];
         }
     }
 
     return dReturnValue/dW;
 }
-
-

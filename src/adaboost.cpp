@@ -11,49 +11,46 @@ CAdaBoost::~CAdaBoost()
 }
 
 
-GBMRESULT CAdaBoost::ComputeWorkingResponse
+void CAdaBoost::ComputeWorkingResponse
 (
-    double *adY,
-    double *adMisc,
-    double *adOffset,
-    double *adF,
-    double *adZ,
-    double *adWeight,
-    bool *afInBag,
-    unsigned long nTrain,
-	int cIdxOff
+ const double *adY,
+ const double *adMisc,
+ const double *adOffset,
+ const double *adF,
+ double *adZ,
+ const double *adWeight,
+ const bag& afInBag,
+ unsigned long nTrain
 )
 {
-    unsigned long i = 0;
-
-    if(adOffset == NULL)
+  unsigned long i = 0;
+  
+  if(adOffset == NULL)
     {
-        for(i=0; i<nTrain; i++)
+      for(i=0; i<nTrain; i++)
         {
-            adZ[i] = -(2*adY[i]-1) * exp(-(2*adY[i]-1)*adF[i]);
+	  adZ[i] = -(2*adY[i]-1) * std::exp(-(2*adY[i]-1)*adF[i]);
         }
     }
-    else
+  else
     {
-        for(i=0; i<nTrain; i++)
+      for(i=0; i<nTrain; i++)
         {
-            adZ[i] = -(2*adY[i]-1) * exp(-(2*adY[i]-1)*(adOffset[i]+adF[i]));
+	  adZ[i] = -(2*adY[i]-1) * std::exp(-(2*adY[i]-1)*(adOffset[i]+adF[i]));
         }
     }
-
-    return GBM_OK;
 }
 
 
 
-GBMRESULT CAdaBoost::InitF
+void CAdaBoost::InitF
 (
-    double *adY,
-    double *adMisc,
-    double *adOffset,
-    double *adWeight,
-    double &dInitF,
-    unsigned long cLength
+ const double *adY,
+ const double *adMisc,
+ const double *adOffset,
+ const double *adWeight,
+ double &dInitF,
+ unsigned long cLength
 )
 {
     unsigned long i=0;
@@ -64,49 +61,45 @@ GBMRESULT CAdaBoost::InitF
 
     if(adOffset == NULL)
     {
-        for(i=0; i<cLength; i++)
+      for(i=0; i<cLength; i++)
         {
-            if(adY[i]==1.0)
+	  if(adY[i]==1.0)
             {
-                dNum += adWeight[i];
+	      dNum += adWeight[i];
             }
-            else
+	  else
             {
                 dDen += adWeight[i];
             }
         }
     }
     else
-    {
+      {
         for(i=0; i<cLength; i++)
         {
-            if(adY[i]==1.0)
+	  if(adY[i]==1.0)
             {
-                dNum += adWeight[i] * exp(-adOffset[i]);
+	      dNum += adWeight[i] * std::exp(-adOffset[i]);
             }
-            else
+	  else
             {
-                dDen += adWeight[i] * exp(adOffset[i]);
+	      dDen += adWeight[i] * std::exp(adOffset[i]);
             }
         }
-    }
-
-    dInitF = 0.5*log(dNum/dDen);
-
-    return GBM_OK;
+      }
+    
+    dInitF = 0.5*std::log(dNum/dDen);
 }
 
 
 double CAdaBoost::Deviance
 (
-    double *adY,
-    double *adMisc,
-    double *adOffset,
-    double *adWeight,
-    double *adF,
-    unsigned long cLength,
-	int cIdxOff
-)
+    const double *adY,
+    const double *adMisc,
+    const double *adOffset,
+    const double *adWeight,
+    const double *adF,
+    unsigned long cLength)
 {
     unsigned long i=0;
     double dL = 0.0;
@@ -114,17 +107,17 @@ double CAdaBoost::Deviance
 
     if(adOffset == NULL)
     {
-        for(i=cIdxOff; i<cLength+cIdxOff; i++)
+        for(i=0; i!=cLength; i++)
         {
-            dL += adWeight[i] * exp(-(2*adY[i]-1)*adF[i]);
+            dL += adWeight[i] * std::exp(-(2*adY[i]-1)*adF[i]);
             dW += adWeight[i];
         }
     }
     else
     {
-        for(i=cIdxOff; i<cLength+cIdxOff; i++)
+        for(i=0; i!=cLength; i++)
         {
-            dL += adWeight[i] * exp(-(2*adY[i]-1)*(adOffset[i]+adF[i]));
+            dL += adWeight[i] * std::exp(-(2*adY[i]-1)*(adOffset[i]+adF[i]));
             dW += adWeight[i];
        }
     }
@@ -133,76 +126,71 @@ double CAdaBoost::Deviance
 }
 
 
-GBMRESULT CAdaBoost::FitBestConstant
+void CAdaBoost::FitBestConstant
 (
-    double *adY,
-    double *adMisc,
-    double *adOffset,
-    double *adW,
-    double *adF,
+    const double *adY,
+    const double *adMisc,
+    const double *adOffset,
+    const double *adW,
+    const double *adF,
     double *adZ,
     const std::vector<unsigned long>& aiNodeAssign,
     unsigned long nTrain,
     VEC_P_NODETERMINAL vecpTermNodes,
     unsigned long cTermNodes,
     unsigned long cMinObsInNode,
-    bool *afInBag,
-    double *adFadj,
-	int cIdxOff
+    const bag& afInBag,
+    const double *adFadj
 )
 {
-    GBMRESULT hr = GBM_OK;
+  double dF = 0.0;
+  unsigned long iObs = 0;
+  unsigned long iNode = 0;
+  vecdNum.resize(cTermNodes);
+  vecdNum.assign(vecdNum.size(),0.0);
+  vecdDen.resize(cTermNodes);
+  vecdDen.assign(vecdDen.size(),0.0);
+    
 
-    double dF = 0.0;
-    unsigned long iObs = 0;
-    unsigned long iNode = 0;
-    vecdNum.resize(cTermNodes);
-    vecdNum.assign(vecdNum.size(),0.0);
-    vecdDen.resize(cTermNodes);
-    vecdDen.assign(vecdDen.size(),0.0);
-
-
-    for(iObs=0; iObs<nTrain; iObs++)
+  for(iObs=0; iObs<nTrain; iObs++)
     {
-        if(afInBag[iObs])
+      if(afInBag[iObs])
         {
-            dF = adF[iObs] + ((adOffset==NULL) ? 0.0 : adOffset[iObs]);
-            vecdNum[aiNodeAssign[iObs]] +=
-                adW[iObs]*(2*adY[iObs]-1)*exp(-(2*adY[iObs]-1)*dF);
-            vecdDen[aiNodeAssign[iObs]] +=
-                adW[iObs]*exp(-(2*adY[iObs]-1)*dF);
+	  dF = adF[iObs] + ((adOffset==NULL) ? 0.0 : adOffset[iObs]);
+	  vecdNum[aiNodeAssign[iObs]] +=
+	    adW[iObs]*(2*adY[iObs]-1)*std::exp(-(2*adY[iObs]-1)*dF);
+	  vecdDen[aiNodeAssign[iObs]] +=
+	    adW[iObs]*std::exp(-(2*adY[iObs]-1)*dF);
         }
     }
-
-    for(iNode=0; iNode<cTermNodes; iNode++)
+  
+  for(iNode=0; iNode<cTermNodes; iNode++)
     {
-        if(vecpTermNodes[iNode]!=NULL)
+      if(vecpTermNodes[iNode]!=NULL)
         {
-            if(vecdDen[iNode] == 0)
+	  if(vecdDen[iNode] == 0)
             {
-                vecpTermNodes[iNode]->dPrediction = 0.0;
+	      vecpTermNodes[iNode]->dPrediction = 0.0;
             }
-            else
+	  else
             {
-                vecpTermNodes[iNode]->dPrediction =
-                    vecdNum[iNode]/vecdDen[iNode];
+	      vecpTermNodes[iNode]->dPrediction =
+		vecdNum[iNode]/vecdDen[iNode];
             }
         }
     }
-
-    return hr;
 }
 
 
 double CAdaBoost::BagImprovement
 (
-    double *adY,
-    double *adMisc,
-    double *adOffset,
-    double *adWeight,
-    double *adF,
-    double *adFadj,
-    bool *afInBag,
+    const double *adY,
+    const double *adMisc,
+    const double *adOffset,
+    const double *adWeight,
+    const double *adF,
+    const double *adFadj,
+    const bag& afInBag,
     double dStepSize,
     unsigned long nTrain
 )
@@ -219,8 +207,8 @@ double CAdaBoost::BagImprovement
             dF = adF[i] + ((adOffset==NULL) ? 0.0 : adOffset[i]);
 
             dReturnValue += adWeight[i]*
-                (exp(-(2*adY[i]-1)*dF) -
-                 exp(-(2*adY[i]-1)*(dF+dStepSize*adFadj[i])));
+                (std::exp(-(2*adY[i]-1)*dF) -
+                 std::exp(-(2*adY[i]-1)*(dF+dStepSize*adFadj[i])));
             dW += adWeight[i];
         }
     }

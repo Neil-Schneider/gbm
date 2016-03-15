@@ -11,57 +11,46 @@ CGaussian::~CGaussian()
 }
 
 
-GBMRESULT CGaussian::ComputeWorkingResponse
+void CGaussian::ComputeWorkingResponse
 (
-    double *adY,
-    double *adMisc,
-    double *adOffset,
-    double *adF,
-    double *adZ,
-    double *adWeight,
-    bool *afInBag,
-    unsigned long nTrain,
-	int cIdxOff
-)
+ const double *adY,
+ const double *adMisc,
+ const double *adOffset,
+ const double *adF,
+ double *adZ,
+ const double *adWeight,
+ const bag& afInBag,
+ unsigned long nTrain
+ )
 {
-    GBMRESULT hr = GBM_OK;
-    unsigned long i = 0;
-
-    if((adY == NULL) || (adF == NULL) || (adZ == NULL) || (adWeight == NULL))
+  unsigned long i = 0;
+  
+  if (!(adY && adF && adZ && adWeight)) {
+    throw GBM::invalid_argument();
+  }
+  
+  if(adOffset == NULL)
     {
-        hr = GBM_INVALIDARG;
-        goto Error;
-    }
-
-    if(adOffset == NULL)
-    {
-        for(i=0; i<nTrain; i++)
+      for(i=0; i<nTrain; i++)
         {
-            adZ[i] = adY[i] - adF[i];
+	  adZ[i] = adY[i] - adF[i];
         }
     }
-    else
+  else
     {
-        for(i=0; i<nTrain; i++)
+      for(i=0; i<nTrain; i++)
         {
-            adZ[i] = adY[i] - adOffset[i] - adF[i];
+	  adZ[i] = adY[i] - adOffset[i] - adF[i];
         }
     }
-
-Cleanup:
-    return hr;
-Error:
-    goto Cleanup;
 }
 
-
-
-GBMRESULT CGaussian::InitF
+void CGaussian::InitF
 (
-    double *adY,
-    double *adMisc,
-    double *adOffset,
-    double *adWeight,
+    const double *adY,
+    const double *adMisc,
+    const double *adOffset,
+    const double *adWeight,
     double &dInitF,
     unsigned long cLength
 )
@@ -88,20 +77,17 @@ GBMRESULT CGaussian::InitF
         }
     }
     dInitF = dSum/dTotalWeight;
-
-    return GBM_OK;
 }
 
 
 double CGaussian::Deviance
 (
-    double *adY,
-    double *adMisc,
-    double *adOffset,
-    double *adWeight,
-    double *adF,
-    unsigned long cLength,
-	int cIdxOff
+    const double *adY,
+    const double *adMisc,
+    const double *adOffset,
+    const double *adWeight,
+    const double *adF,
+    unsigned long cLength
 )
 {
     unsigned long i=0;
@@ -110,7 +96,7 @@ double CGaussian::Deviance
 
     if(adOffset == NULL)
     {
-        for(i=cIdxOff; i<cLength+cIdxOff; i++)
+        for(i=0; i<cLength; i++)
         {
             dL += adWeight[i]*(adY[i]-adF[i])*(adY[i]-adF[i]);
             dW += adWeight[i];
@@ -118,7 +104,7 @@ double CGaussian::Deviance
     }
     else
     {
-        for(i=cIdxOff; i<cLength+cIdxOff; i++)
+        for(i=0; i<cLength; i++)
         {
             dL += adWeight[i]*(adY[i]-adOffset[i]-adF[i])*
                               (adY[i]-adOffset[i]-adF[i]);
@@ -130,39 +116,36 @@ double CGaussian::Deviance
 }
 
 
-GBMRESULT CGaussian::FitBestConstant
+void CGaussian::FitBestConstant
 (
-    double *adY,
-    double *adMisc,
-    double *adOffset,
-    double *adW,
-    double *adF,
+    const double *adY,
+    const double *adMisc,
+    const double *adOffset,
+    const double *adW,
+    const double *adF,
     double *adZ,
     const std::vector<unsigned long>& aiNodeAssign,
     unsigned long nTrain,
     VEC_P_NODETERMINAL vecpTermNodes,
     unsigned long cTermNodes,
     unsigned long cMinObsInNode,
-    bool *afInBag,
-    double *adFadj,
-	int cIdxOff
+    const bag& afInBag,
+    const double *adFadj
 )
 {
-    // the tree aready stores the mean prediction
-    // no refitting necessary
-
-    return GBM_OK;
+  // the tree aready stores the mean prediction
+  // no refitting necessary
 }
 
 double CGaussian::BagImprovement
 (
-    double *adY,
-    double *adMisc,
-    double *adOffset,
-    double *adWeight,
-    double *adF,
-    double *adFadj,
-    bool *afInBag,
+    const double *adY,
+    const double *adMisc,
+    const double *adOffset,
+    const double *adWeight,
+    const double *adF,
+    const double *adFadj,
+    const bag& afInBag,
     double dStepSize,
     unsigned long nTrain
 )

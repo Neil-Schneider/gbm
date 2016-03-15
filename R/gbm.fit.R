@@ -1,3 +1,4 @@
+#' @export gbm.fit
 gbm.fit <- function(x,y,
                     offset = NULL,
                     misc = NULL,
@@ -22,22 +23,25 @@ gbm.fit <- function(x,y,
 
    cRows <- nrow(x)
    cCols <- ncol(x)
-
-   if(nrow(x) != ifelse("Surv" %in% class(y), nrow(y), length(y))) {
-      stop("The number of rows in x does not equal the length of y.")
-   }
+   
+   checkSanity(x, y)
+   ch <- checkMissing(x, y)
+   checkVarType(x, y)
+   
+   oldy <- y
+   y <- checkY(oldy)
 
    # the preferred way to specify the number of training instances is via parameter 'nTrain'.
    # parameter 'train.fraction' is only maintained for backward compatibility.
 
    if(!is.null(nTrain) && !is.null(train.fraction)) {
       stop("Parameters 'nTrain' and 'train.fraction' cannot both be specified")
-   }
-   else if(!is.null(train.fraction)) {
+   
+   } else if(!is.null(train.fraction)) {
       warning("Parameter 'train.fraction' of gbm.fit is deprecated, please specify 'nTrain' instead")
       nTrain <- floor(train.fraction*cRows)
-   }
-   else if(is.null(nTrain)) {
+   
+   } else if(is.null(nTrain)) {
      # both undefined, use all training data
      nTrain <- cRows
    }
@@ -66,7 +70,6 @@ gbm.fit <- function(x,y,
    }
 
    # Do sanity checks
-   ch <- checkMissing(x, y)
    interaction.depth <- checkID(interaction.depth)
    w <- checkWeights(w, length(y))
    offset <- checkOffset(offset, y, distribution)
@@ -76,27 +79,29 @@ gbm.fit <- function(x,y,
    # setup variable types
    var.type <- rep(0, cCols)
    var.levels <- vector("list", cCols)
+   
+   
    for(i in 1:length(var.type)) {
-      if(all(is.na(x[,i]))) {
-         stop("variable ",i,": ",var.names[i]," has only missing values.")
-      }
+     
       if(is.ordered(x[,i])) {
+        
          var.levels[[i]] <- levels(factor(x[,i]))
          x[,i] <- as.numeric(factor(x[,i]))-1
          var.type[i] <- 0
+         
       }
+     
       else if(is.factor(x[,i])) {
-         if(length(levels(x[,i]))>1024)
-            stop("gbm does not currently handle categorical variables with more than 1024 levels. Variable ",i,": ",var.names[i]," has ",length(levels(x[,i]))," levels.")
+      
          var.levels[[i]] <- levels(factor(x[,i]))
          x[,i] <- as.numeric(factor(x[,i]))-1
          var.type[i] <- max(x[,i],na.rm=TRUE)+1
+         
       }
       else if(is.numeric(x[,i])) {
+        
         var.levels[[i]] <- quantile(x[,i],prob=(0:10)/10,na.rm=TRUE)
-      }
-      else{
-         stop("variable ",i,": ",var.names[i]," is not of type numeric, ordered, or factor.")
+        
       }
 
       # check for some variation in each variable
@@ -104,15 +109,14 @@ gbm.fit <- function(x,y,
          warning("variable ",i,": ",var.names[i]," has no variation.")
       }
    }
-
-   nClass <- 1
-
+   
+   
    if(!("name" %in% names(distribution))) {
       stop("The distribution is missing a 'name' component, for example list(name=\"gaussian\")")
    }
    supported.distributions <-
    c("bernoulli","gaussian","poisson","adaboost","laplace","coxph","quantile",
-     "tdist", "multinomial", "huberized", "pairwise")
+     "tdist", "huberized", "pairwise","gamma","tweedie")
 
    distribution.call.name <- distribution$name
 
@@ -133,6 +137,22 @@ gbm.fit <- function(x,y,
    {
       stop("Poisson requires the response to be positive")
    }
+   if((distribution$name == "gamma") && any(y<0))
+   {
+      stop("Gamma requires the response to be positive")
+   }
+   if(distribution$name == "tweedie")
+   {
+      if(any(y<0))
+      {
+         stop("Tweedie requires the response to be positive")
+      }
+      if(is.null(distribution$power))
+      {
+         distribution$power = 1.5
+      }
+      Misc <- c(power=distribution$power)
+   }
    if((distribution$name == "poisson") && any(y != trunc(y)))
    {
       stop("Poisson requires the response to be a positive integer")
@@ -143,10 +163,6 @@ gbm.fit <- function(x,y,
    }
    if(distribution$name == "quantile")
    {
-      if(length(unique(w)) > 1)
-      {
-         stop("This version of gbm for the quantile regression lacks a weighted quantile. For now the weights must be constant.")
-      }
       if(is.null(distribution$alpha))
       {
          stop("For quantile regression, the distribution parameter must be a list with a parameter 'alpha' indicating the quantile, for example list(name=\"quantile\",alpha=0.95).")
@@ -187,7 +203,7 @@ gbm.fit <- function(x,y,
       Misc <- Misc[i.timeorder]
       x <- x[i.timeorder,,drop=FALSE]
       w <- w[i.timeorder]
-      if(is.null(offset)) offset <- offset[i.timeorder]
+      if(!is.null(offset)) offset <- offset[i.timeorder]
    }
    if(distribution$name == "tdist")
    {
@@ -198,44 +214,6 @@ gbm.fit <- function(x,y,
          Misc <- distribution$df[1]
       }
    }
-   if (distribution$name == "multinomial")
-   {
-      ## Ensure that the training set contains all classes
-      classes <- attr(factor(y), "levels")
-      nClass <- length(classes)
-
-      if (nClass > nTrain){
-         stop(paste("Number of classes (", nClass,
-                    ") must be less than the size of the training set (", nTrain, ")",
-                    sep = ""))
-      }
-
-      #    f <- function(a,x){
-      #       min((1:length(x))[x==a])
-      #    }
-
-      new.idx <- as.vector(sapply(classes, function(a,x){ min((1:length(x))[x==a]) }, y))
-
-      all.idx <- 1:length(y)
-      new.idx <- c(new.idx, all.idx[!(all.idx %in% new.idx)])
-
-      y <- y[new.idx]
-      x <- x[new.idx, ]
-      w <- w[new.idx]
-      if (!is.null(offset)){
-         offset <- offset[new.idx]
-      }
-
-      ## Get the factors
-      y <- as.numeric(as.vector(outer(y, classes, "==")))
-
-      ## Fill out the weight and offset
-      w <- rep(w, nClass)
-      if (!is.null(offset)){
-         offset <- rep(offset, nClass)
-      }
-   } # close if (dist... == "multinomial"
-
    if(distribution$name == "pairwise")
    {
       distribution.metric <- distribution[["metric"]]
@@ -292,10 +270,6 @@ gbm.fit <- function(x,y,
    x.order <- apply(x[1:nTrain,,drop=FALSE],2,order,na.last=FALSE)-1
 
    x <- as.vector(data.matrix(x))
-   predF <- rep(0,length(y))
-   train.error <- rep(0,n.trees)
-   valid.error <- rep(0,n.trees)
-   oobag.improve <- rep(0,n.trees)
 
    if(is.null(var.monotone)) var.monotone <- rep(0,cCols)
    else if(length(var.monotone)!=cCols)
@@ -306,24 +280,20 @@ gbm.fit <- function(x,y,
    {
       stop("var.monotone must be -1, 0, or 1")
    }
-   fError <- FALSE
 
    gbm.obj <- .Call("gbm",
                     Y=as.double(y),
                     Offset=as.double(offset),
-                    X=as.double(x),
+                    X=matrix(x, cRows, cCols),
                     X.order=as.integer(x.order),
                     weights=as.double(w),
                     Misc=as.double(Misc),
-                    cRows=as.integer(cRows),
-                    cCols=as.integer(cCols),
                     var.type=as.integer(var.type),
                     var.monotone=as.integer(var.monotone),
                     distribution=as.character(distribution.call.name),
                     n.trees=as.integer(n.trees),
                     interaction.depth=as.integer(interaction.depth),
                     n.minobsinnode=as.integer(n.minobsinnode),
-                    n.classes = as.integer(nClass),
                     shrinkage=as.double(shrinkage),
                     bag.fraction=as.double(bag.fraction),
                     nTrain=as.integer(nTrain),
@@ -334,15 +304,11 @@ gbm.fit <- function(x,y,
                     verbose=as.integer(verbose),
                     PACKAGE = "gbm")
 
-   names(gbm.obj) <- c("initF","fit","train.error","valid.error",
-                       "oobag.improve","trees","c.splits")
-
    gbm.obj$bag.fraction <- bag.fraction
    gbm.obj$distribution <- distribution
    gbm.obj$interaction.depth <- interaction.depth
    gbm.obj$n.minobsinnode <- n.minobsinnode
-   gbm.obj$num.classes <- nClass
-   gbm.obj$n.trees <- length(gbm.obj$trees) / nClass
+   gbm.obj$n.trees <- length(gbm.obj$trees)
    gbm.obj$nTrain <- nTrain
    gbm.obj$mFeatures <- mFeatures
    gbm.obj$train.fraction <- train.fraction
@@ -359,38 +325,18 @@ gbm.fit <- function(x,y,
    {
       gbm.obj$fit[i.timeorder] <- gbm.obj$fit
    }
-   ## If K-Classification is used then split the fit and tree components
-   if (distribution$name == "multinomial"){
-      gbm.obj$fit <- matrix(gbm.obj$fit, ncol = nClass)
-      dimnames(gbm.obj$fit)[[2]] <- classes
-      gbm.obj$classes <- classes
-
-      ## Also get the class estimators
-      exp.f <- exp(gbm.obj$fit)
-      denom <- matrix(rep(rowSums(exp.f), nClass), ncol = nClass)
-      gbm.obj$estimator <- exp.f/denom
-   }
+   
 
    if(keep.data)
    {
       if(distribution$name == "coxph")
       {
          # put the observations back in order
-         gbm.obj$data <- list(y=y,x=x,x.order=x.order,offset=offset,Misc=Misc,w=w,
+         gbm.obj$data <- list(y=oldy,x=x,x.order=x.order,offset=offset,Misc=Misc,w=w,
                               i.timeorder=i.timeorder)
-      }
-      else if ( distribution$name == "multinomial" ){
-         # Restore original order of the data
-         new.idx <- order( new.idx )
-         gbm.obj$data <- list( y=as.vector(matrix(y, ncol=length(classes),byrow=FALSE)[new.idx,]),
-                              x=as.vector(matrix(x, ncol=length(var.names), byrow=FALSE)[new.idx,]),
-                              x.order=x.order,
-                              offset=offset[new.idx],
-                              Misc=Misc, w=w[new.idx] )
-      }
-      else
+     } else
       {
-         gbm.obj$data <- list(y=y,x=x,x.order=x.order,offset=offset,Misc=Misc,w=w)
+         gbm.obj$data <- list(y=oldy,x=x,x.order=x.order,offset=offset,Misc=Misc,w=w)
       }
    }
    else

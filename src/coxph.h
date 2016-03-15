@@ -30,61 +30,50 @@ public:
 
     virtual ~CCoxPH();
 
-	GBMRESULT UpdateParams(double *adF,
-	                       double *adOffset,
-						   double *adWeight,
-	                       unsigned long cLength)
-	{
-		return GBM_OK;
-	};
+    void ComputeWorkingResponse(const double *adT,
+				const double *adDelta,
+				const double *adOffset,
+				const double *adF,
+				double *adZ,
+				const double *adWeight,
+				const bag& afInBag,
+				unsigned long nTrain);
 
-    GBMRESULT ComputeWorkingResponse(double *adT,
-                                   double *adDelta,
-                                   double *adOffset,
-                                   double *adF,
-                                   double *adZ,
-                                   double *adWeight,
-                                   bool *afInBag,
-                                   unsigned long nTrain,
-                                   int cIdxOff);
+    void InitF(const double *adT,
+	       const double *adDelta,
+	       const double *adOffset,
+	       const double *adWeight,
+	       double &dInitF,
+	       unsigned long cLength);
+    
+    void FitBestConstant(const double *adT,
+			 const double *adDelta,
+			 const double *adOffset,
+			 const double *adW,
+			 const double *adF,
+			 double *adZ,
+			 const std::vector<unsigned long>& aiNodeAssign,
+			 unsigned long nTrain,
+			 VEC_P_NODETERMINAL vecpTermNodes,
+			 unsigned long cTermNodes,
+			 unsigned long cMinObsInNode,
+			 const bag& afInBag,
+			 const double *adFadj);
+    
+    double Deviance(const double *adT,
+                    const double *adDelta,
+                    const double *adOffset,
+                    const double *adWeight,
+                    const double *adF,
+                    unsigned long cLength);
 
-    GBMRESULT InitF(double *adT,
-                  double *adDelta,
-                  double *adOffset,
-                  double *adWeight,
-                  double &dInitF,
-                  unsigned long cLength);
-
-    GBMRESULT FitBestConstant(double *adT,
-                            double *adDelta,
-                            double *adOffset,
-                            double *adW,
-                            double *adF,
-                            double *adZ,
-    		      const std::vector<unsigned long>& aiNodeAssign,
-                            unsigned long nTrain,
-                            VEC_P_NODETERMINAL vecpTermNodes,
-                            unsigned long cTermNodes,
-                            unsigned long cMinObsInNode,
-                            bool *afInBag,
-                            double *adFadj,
-	                        int cIdxOff);
-
-    double Deviance(double *adT,
-                    double *adDelta,
-                    double *adOffset,
-                    double *adWeight,
-                    double *adF,
-                    unsigned long cLength,
-	                int cIdxOff);
-
-    double BagImprovement(double *adT,
-                          double *adDelta,
-                          double *adOffset,
-                          double *adWeight,
-                          double *adF,
-                          double *adFadj,
-                          bool *afInBag,
+    double BagImprovement(const double *adT,
+                          const double *adDelta,
+                          const double *adOffset,
+                          const double *adWeight,
+                          const double *adF,
+                          const double *adFadj,
+                          const bag& afInBag,
                           double dStepSize,
                           unsigned long nTrain);
 

@@ -13,17 +13,16 @@ CHuberized::~CHuberized()
 }
 
 
-GBMRESULT CHuberized::ComputeWorkingResponse
+void CHuberized::ComputeWorkingResponse
 (
-    double *adY,
-    double *adMisc,
-    double *adOffset,
-    double *adF,
+    const double *adY,
+    const double *adMisc,
+    const double *adOffset,
+    const double *adF,
     double *adZ,
-    double *adWeight,
-    bool *afInBag,
-    unsigned long nTrain,
-    int cIdxOff
+    const double *adWeight,
+    const bag& afInBag,
+    unsigned long nTrain
 )
 {
    unsigned long i = 0;
@@ -45,15 +44,14 @@ GBMRESULT CHuberized::ComputeWorkingResponse
          adZ[i] = -2 * (2*adY[i]-1) * ( 1 - (2*adY[i]-1)*dF );
       }
    }
-   return GBM_OK;
 }
 
-GBMRESULT CHuberized::InitF
+void CHuberized::InitF
 (
-    double *adY,
-    double *adMisc,
-    double *adOffset,
-    double *adWeight,
+    const double *adY,
+    const double *adMisc,
+    const double *adOffset,
+    const double *adWeight,
     double &dInitF,
     unsigned long cLength
 )
@@ -77,20 +75,17 @@ GBMRESULT CHuberized::InitF
     }
 
     dInitF = dNum/dDen;
-
-    return GBM_OK;
 }
 
 
 double CHuberized::Deviance
 (
-    double *adY,
-    double *adMisc,
-    double *adOffset,
-    double *adWeight,
-    double *adF,
-    unsigned long cLength,
-    int cIdxOff
+    const double *adY,
+    const double *adMisc,
+    const double *adOffset,
+    const double *adWeight,
+    const double *adF,
+    unsigned long cLength
 )
 {
    unsigned long i=0;
@@ -100,7 +95,7 @@ double CHuberized::Deviance
 
    if(adOffset==NULL)
    {
-      for(i=cIdxOff; i<cLength+cIdxOff; i++)
+      for(i=0; i<cLength; i++)
       {
         if ( (2*adY[i]-1)*adF[i] < -1 )
          {
@@ -119,7 +114,7 @@ double CHuberized::Deviance
    } // close if (adOffset==NULL)
    else
    {
-      for(i=cIdxOff; i<cLength+cIdxOff; i++)
+      for(i=0; i<cLength; i++)
       {
          dF = adOffset[i]+adF[i];
          if ( (2*adY[i]-1)*adF[i] < -1 )
@@ -145,85 +140,80 @@ double CHuberized::Deviance
 }
 
 
-GBMRESULT CHuberized::FitBestConstant
+void CHuberized::FitBestConstant
 (
-    double *adY,
-    double *adMisc,
-    double *adOffset,
-    double *adW,
-    double *adF,
+    const double *adY,
+    const double *adMisc,
+    const double *adOffset,
+    const double *adW,
+    const double *adF,
     double *adZ,
     const std::vector<unsigned long>& aiNodeAssign,
     unsigned long nTrain,
     VEC_P_NODETERMINAL vecpTermNodes,
     unsigned long cTermNodes,
     unsigned long cMinObsInNode,
-    bool *afInBag,
-    double *adFadj,
-   int cIdxOff
+    const bag& afInBag,
+    const double *adFadj
 )
 {
-    GBMRESULT hr = GBM_OK;
-
-    double dF = 0.0;
-    unsigned long iObs = 0;
-    unsigned long iNode = 0;
-    vecdNum.resize(cTermNodes);
-    vecdNum.assign(vecdNum.size(),0.0);
-    vecdDen.resize(cTermNodes);
-    vecdDen.assign(vecdDen.size(),0.0);
-
-    for(iObs=0; iObs<nTrain; iObs++)
+  double dF = 0.0;
+  unsigned long iObs = 0;
+  unsigned long iNode = 0;
+  vecdNum.resize(cTermNodes);
+  vecdNum.assign(vecdNum.size(),0.0);
+  vecdDen.resize(cTermNodes);
+  vecdDen.assign(vecdDen.size(),0.0);
+  
+  for(iObs=0; iObs<nTrain; iObs++)
     {
-        if(afInBag[iObs])
+      if(afInBag[iObs])
         {
-           dF = adF[iObs] + ((adOffset==NULL) ? 0.0 : adOffset[iObs]);
-           if( (2*adY[iObs]-1)*adF[iObs] < -1 ){
-              vecdNum[aiNodeAssign[iObs]] +=
-                adW[iObs]*4*(2*adY[iObs]-1);
-              vecdDen[aiNodeAssign[iObs]] +=
-                -adW[iObs]*4*(2*adY[iObs]-1)*dF;
-           }
-           else if ( 1 - (2*adY[iObs]-1)*adF[iObs] < 0 ){
-              vecdNum[aiNodeAssign[iObs]] += 0;
-              vecdDen[aiNodeAssign[iObs]] += 0;
-           }
-           else{
-              vecdNum[aiNodeAssign[iObs]] += adW[iObs]*2*(2*adY[iObs]-1)*( 1 - (2*adY[iObs]-1)*adF[iObs] );
-              vecdDen[aiNodeAssign[iObs]] += adW[iObs]*( 1 - (2*adY[iObs]-1)*adF[iObs])*( 1 - (2*adY[iObs]-1)*adF[iObs]);
-           }
+	  dF = adF[iObs] + ((adOffset==NULL) ? 0.0 : adOffset[iObs]);
+	  if( (2*adY[iObs]-1)*adF[iObs] < -1 ){
+	    vecdNum[aiNodeAssign[iObs]] +=
+	      adW[iObs]*4*(2*adY[iObs]-1);
+	    vecdDen[aiNodeAssign[iObs]] +=
+	      -adW[iObs]*4*(2*adY[iObs]-1)*dF;
+	  }
+	  else if ( 1 - (2*adY[iObs]-1)*adF[iObs] < 0 ){
+	    vecdNum[aiNodeAssign[iObs]] += 0;
+	    vecdDen[aiNodeAssign[iObs]] += 0;
+	  }
+	  else{
+	    vecdNum[aiNodeAssign[iObs]] += adW[iObs]*2*(2*adY[iObs]-1)*( 1 - (2*adY[iObs]-1)*adF[iObs] );
+	    vecdDen[aiNodeAssign[iObs]] += adW[iObs]*( 1 - (2*adY[iObs]-1)*adF[iObs])*( 1 - (2*adY[iObs]-1)*adF[iObs]);
+	  }
         } // close if(afInBag[iObs
     }
-
-    for(iNode=0; iNode<cTermNodes; iNode++)
+  
+  for(iNode=0; iNode<cTermNodes; iNode++)
     {
-        if(vecpTermNodes[iNode]!=NULL)
+      if(vecpTermNodes[iNode]!=NULL)
         {
-            if(vecdDen[iNode] == 0)
+	  if(vecdDen[iNode] == 0)
             {
-                vecpTermNodes[iNode]->dPrediction = 0.0;
+	      vecpTermNodes[iNode]->dPrediction = 0.0;
             }
-            else
+	  else
             {
-                vecpTermNodes[iNode]->dPrediction =
-                    vecdNum[iNode]/vecdDen[iNode];
+	      vecpTermNodes[iNode]->dPrediction =
+		vecdNum[iNode]/vecdDen[iNode];
             }
         }
     }
-
-    return hr;
 }
 
 
 double CHuberized::BagImprovement
 (
-    double *adY,
-    double *adMisc,
-    double *adOffset,
-    double *adWeight,
-    double *adF,
-    double *adFadj,
-    bool *afInBag,
+    const double *adY,
+    const double *adMisc,
+    const double *adOffset,
+    const double *adWeight,
+    const double *adF,
+    const double *adFadj,
+    const bag& afInBag,
     double dStepSize,
     unsigned long nTrain
 )

@@ -41,59 +41,56 @@ public:
 // * cLength  - Number of instances (size of vectors)
 // * afInBag  - true if instance is part of training set for current tree
 //              (depends on random subsampling)
-// * cIdxOff  - Offset used for multi-class training (CMultinomial).
 
 // Initialize() is called once, before training starts.
 // It gives derived classes a chance for custom preparations, e.g., to allocate
 // memory or to pre-compute values that do not change between iterations.
 
-    virtual GBMRESULT Initialize(double *adY,
-                                 double *adMisc,
-                                 double *adOffset,
-                                 double *adWeight,
-                                 unsigned long cLength) { return GBM_OK; }
+    virtual void Initialize(const double *adY,
+			    const double *adMisc,
+			    const double *adOffset,
+			    const double *adWeight,
+			    unsigned long cLength) {  }
 
 // UpdateParams() is called at the start of each iteration.
 // CMultinomial uses it to normalize predictions across multiple classes.
 
-    virtual GBMRESULT UpdateParams(double *adF,
-                                   double *adOffset,
-                                   double *adWeight,
-                                   unsigned long cLength) = 0;
+    virtual void UpdateParams(const double *adF,
+			      const double *adOffset,
+			      const double *adWeight,
+			      unsigned long cLength) { };
 
 // ComputeWorkingResonse() calculates the negative gradients of the
 // loss function, and stores them in adZ.
-
-    virtual GBMRESULT ComputeWorkingResponse(double *adY,
-                                             double *adMisc,
-                                             double *adOffset,
-                                             double *adF,
-                                             double *adZ,
-                                             double *adWeight,
-                                             bool *afInBag,
-                                             unsigned long cLength,
-	                                     int cIdxOff) = 0;
+    
+    virtual void ComputeWorkingResponse(const double *adY,
+					const double *adMisc,
+					const double *adOffset,
+					const double *adF,
+					double *adZ,
+					const double *adWeight,
+					const bag& afInBag,
+					unsigned long cLength) = 0;
 
 // InitF() computes the best constant prediction for all instances, and
 // stores it in dInitF.
 
-    virtual GBMRESULT InitF(double *adY,
-                            double *adMisc,
-                            double *adOffset,
-                            double *adWeight,
-                            double &dInitF,
-                            unsigned long cLength) = 0;
+    virtual void InitF(const double *adY,
+		       const double *adMisc,
+		       const double *adOffset,
+		       const double *adWeight,
+		       double &dInitF,
+		       unsigned long cLength) = 0;
 
 // Deviance() returns the value of the loss function, based on the
 // current predictions (adF).
 
-    virtual double Deviance(double *adY,
-                            double *adMisc,
-                            double *adOffset,
-                            double *adWeight,
-                            double *adF,
-                            unsigned long cLength,
-	                    int cIdxOff) = 0;
+    virtual double Deviance(const double *adY,
+                            const double *adMisc,
+                            const double *adOffset,
+                            const double *adWeight,
+                            const double *adF,
+                            unsigned long cLength) = 0;
 
 // FitBestConstant() calculates and sets prediction values for all terminal nodes
 // of the tree being currently constructed.
@@ -104,33 +101,32 @@ public:
 // * aiNodeAssign is a vector of size cLength, that maps each instance to an index
 //   into vecpTermNodes for the corresponding terminal node.
 
-    virtual GBMRESULT FitBestConstant(double *adY,
-                                    double *adMisc,
-                                    double *adOffset,
-                                    double *adWeight,
-                                    double *adF,
-                                    double *adZ,
- 			      const std::vector<unsigned long>& aiNodeAssign,
-                                    unsigned long cLength,
-                                    VEC_P_NODETERMINAL vecpTermNodes,
-                                    unsigned long cTermNodes,
-                                    unsigned long cMinObsInNode,
-                                    bool *afInBag,
-                                    double *adFadj,
-	                            int cIdxOff) = 0;
+    virtual void FitBestConstant(const double *adY,
+				      const double *adMisc,
+				      const double *adOffset,
+				      const double *adWeight,
+				      const double *adF,
+				      double *adZ,
+				      const std::vector<unsigned long>& aiNodeAssign,
+				      unsigned long cLength,
+				      VEC_P_NODETERMINAL vecpTermNodes,
+				      unsigned long cTermNodes,
+				      unsigned long cMinObsInNode,
+				      const bag& afInBag,
+				      const double *adFadj) = 0;
 
 // BagImprovement() returns the incremental difference in the loss
 // function induced by scoring with (adF + dStepSize * adFAdj) instead of adF, for
 // all instances that were not part of the training set for the current tree (i.e.,
 // afInBag set to false).
 
-    virtual double BagImprovement(double *adY,
-                                  double *adMisc,
-                                  double *adOffset,
-                                  double *adWeight,
-                                  double *adF,
-                                  double *adFadj,
-                                  bool *afInBag,
+    virtual double BagImprovement(const double *adY,
+                                  const double *adMisc,
+                                  const double *adOffset,
+                                  const double *adWeight,
+                                  const double *adF,
+                                  const double *adFadj,
+                                  const bag& afInBag,
                                   double dStepSize,
                                   unsigned long cLength) = 0;
 };

@@ -21,98 +21,81 @@ CNodeTerminal::~CNodeTerminal()
     #endif
 }
 
-GBMRESULT CNodeTerminal::Adjust
+void CNodeTerminal::Adjust
 (
     unsigned long cMinObsInNode
 )
 {
-    return GBM_OK;
 }
 
-GBMRESULT CNodeTerminal::ApplyShrinkage
+void CNodeTerminal::ApplyShrinkage
 (
     double dLambda
 )
 {
-    GBMRESULT hr = GBM_OK;
     dPrediction *= dLambda;
-
-    return hr;
 }
 
 
 
-GBMRESULT CNodeTerminal::Predict
+void CNodeTerminal::Predict
 (
-    CDataset *pData,
+    const CDataset &data,
     unsigned long iRow,
     double &dFadj
 )
 {
     dFadj = dPrediction;
-
-    return GBM_OK;
 }
 
 
 
 
-GBMRESULT CNodeTerminal::Predict
+void CNodeTerminal::Predict
 (
-    double *adX,
-    unsigned long cRow,
-    unsigned long cCol,
-    unsigned long iRow,
-    double &dFadj
+ double *adX,
+ unsigned long cRow,
+ unsigned long cCol,
+ unsigned long iRow,
+ double &dFadj
+ )
+{
+  dFadj = dPrediction;
+}
+
+
+
+void CNodeTerminal::PrintSubtree
+(
+ unsigned long cIndent
 )
 {
-    dFadj = dPrediction;
-
-    return GBM_OK;
+  unsigned long i = 0;
+  
+  for(i=0; i< cIndent; i++) Rprintf("  ");
+  Rprintf("N=%f, Prediction=%f *\n",
+	  dTrainW,
+	  dPrediction);
 }
 
 
-
-GBMRESULT CNodeTerminal::PrintSubtree
-(
-    unsigned long cIndent
-)
-{
-    unsigned long i = 0;
-
-    for(i=0; i< cIndent; i++) Rprintf("  ");
-    Rprintf("N=%f, Prediction=%f *\n",
-           dTrainW,
-           dPrediction);
-
-    return GBM_OK;
-}
-
-
-GBMRESULT CNodeTerminal::GetVarRelativeInfluence
+void CNodeTerminal::GetVarRelativeInfluence
 (
     double *adRelInf
 )
 {
-    return GBM_OK;
 }
 
 
-GBMRESULT CNodeTerminal::RecycleSelf
-(
-    CNodeFactory *pNodeFactory
-)
-{
-    pNodeFactory->RecycleNode(this);
-    return GBM_OK;
+void CNodeTerminal::RecycleSelf(CNodeFactory *pNodeFactory) {
+  pNodeFactory->RecycleNode(this);
 };
 
 
-
-GBMRESULT CNodeTerminal::TransferTreeToRList
+void CNodeTerminal::TransferTreeToRList
 (
     int &iNodeID,
-    CDataset *pData,
+    const CDataset &data,
     int *aiSplitVar,
     double *adSplitPoint,
     int *aiLeftNode,
@@ -126,20 +109,16 @@ GBMRESULT CNodeTerminal::TransferTreeToRList
     double dShrinkage
 )
 {
-    GBMRESULT hr = GBM_OK;
-
-    aiSplitVar[iNodeID] = -1;
-    adSplitPoint[iNodeID] = dShrinkage*dPrediction;
-    aiLeftNode[iNodeID] = -1;
-    aiRightNode[iNodeID] = -1;
-    aiMissingNode[iNodeID] = -1;
-    adErrorReduction[iNodeID] = 0.0;
-    adWeight[iNodeID] = dTrainW;
-    adPred[iNodeID] = dShrinkage*dPrediction;
-
-    iNodeID++;
-
-    return hr;
+  aiSplitVar[iNodeID] = -1;
+  adSplitPoint[iNodeID] = dShrinkage*dPrediction;
+  aiLeftNode[iNodeID] = -1;
+  aiRightNode[iNodeID] = -1;
+  aiMissingNode[iNodeID] = -1;
+  adErrorReduction[iNodeID] = 0.0;
+  adWeight[iNodeID] = dTrainW;
+  adPred[iNodeID] = dShrinkage*dPrediction;
+  
+  iNodeID++;
 }
 
 

@@ -1,15 +1,27 @@
 gbm: gradient boosted models
 ----------------------------
 
-Originally written by Greg Ridgeway, added to by various authors, currently
-maintained by Harry Southworth.
+[![Build Status](https://travis-ci.org/gbm-developers/gbm.svg?branch=master)](https://travis-ci.org/gbm-developers/gbm)
+[![CRAN Status Badge](http://www.r-pkg.org/badges/version/gbm)](https://cran.r-project.org/web/packages/gbm/)
+[![Coverage Status](https://coveralls.io/repos/gbm-developers/gbm/badge.svg?branch=master&service=github)](https://coveralls.io/github/gbm-developers/gbm?branch=master)
+
+Originally written by Greg Ridgeway, added to by various authors,
+currently maintained by Harry Southworth.  Development is discussed
+--- somewhat --- at https://groups.google.com/forum/#!forum/gbm-dev .
 
 Non-production releases (bug fixes, mostly) will be released via the GitHub
 release workflow. To install from GitHub, first install `devtools` from CRAN:
 
-    install.packages("devtools")
+```R
+install.packages("devtools")
+```
 
 Then install `gbm` from GitHub:
 
-    library(devtools)
-    install_github("harrysouthworth/gbm")
+```R
+library("devtools")
+install_github("gbm-developers/gbm")
+```
+
+Note that we are currently in the middle of a fairly major tidy up, so
+you should worry a bit about this code here...
